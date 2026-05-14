@@ -1,45 +1,69 @@
 local DebrisModule = {}
+
+-- Services
 local Workspace = game:GetService("Workspace")
 local TweenService = game:GetService("TweenService")
 
+-- DEFAULT CONFIGURATION
 local DEFAULT_CONFIG = {
-	Radius = 12,
-	DebrisCount = 18,
-	FadeOutTime = 1.5,
-	Lifetime = 4,
-	SpawnTime = 0.4,
+	Radius = 12,          -- Distance from center where debris spawns
+	DebrisCount = 18,     -- Number of debris chunks generated
+	FadeOutTime = 1.5,    -- Time taken to fade debris away
+	Lifetime = 4,         -- Time debris exists before fading
+	SpawnTime = 0.4,      -- Rise animation duration
+
+	-- Raycast settings
 	RaycastUp = 50,
 	RaycastDown = 200
 }
 
+-- HELPER: Locate the visuals container
 local function getVisualsFolder()
 	local world = Workspace:FindFirstChild("World")
 	if not world then return nil end
+
 	return world:FindFirstChild("Visuals")
 end
 
+-- HELPER: Locate the map container
 local function getMap()
 	local world = Workspace:FindFirstChild("World")
 	if not world then return nil end
+
 	return world:FindFirstChild("Map")
 end
 
+--  HELPER: Create a debris part matching the source geometry
+-- Instead of using generic debris pieces, the system clones
+-- important visual traits from the hit surface:
+--  • Material
+--  • Color
+--  • Reflectance
+--  • Shape type
 local function createMatchingPartFromSource(sourcePart: BasePart)
 	local newPart
 
+	-- Preserve wedge geometry when possible
 	if sourcePart:IsA("WedgePart") then
 		newPart = Instance.new("WedgePart")
+
+		-- Preserve spherical geometry if source was a ball
 	elseif sourcePart:IsA("Part") and sourcePart.Shape == Enum.PartType.Ball then
 		newPart = Instance.new("Part")
 		newPart.Shape = Enum.PartType.Ball
+
+		-- Default fallback shape
 	else
 		newPart = Instance.new("Part")
 	end
 
+	-- Copy visual properties from the source surface
 	newPart.Material = sourcePart.Material
 	newPart.Color = sourcePart.Color
 	newPart.Reflectance = sourcePart.Reflectance
 	newPart.Transparency = 1
+
+	-- Debris is purely visual:
 	newPart.Anchored = true
 	newPart.CanCollide = false
 	newPart.CanTouch = false
@@ -49,36 +73,66 @@ local function createMatchingPartFromSource(sourcePart: BasePart)
 	return newPart
 end
 
+-- HELPER: Apply randomized sizing
 local function applyRandomSize(part: BasePart, size: Vector3)
+
+	-- Spheres must remain perfectly uniform
 	if part:IsA("Part") and part.Shape == Enum.PartType.Ball then
 		local diameter = math.max(size.X, size.Y, size.Z)
-		part.Size = Vector3.new(diameter, diameter, diameter)
+
+		part.Size = Vector3.new(
+			diameter,
+			diameter,
+			diameter
+		)
+
 	else
 		part.Size = size
 	end
 end
 
+-- INTERNAL: Create a single debris chunk
+-- This is the fundamental debris generation routine used by
+-- CreateDebris().
+-- Workflow:
+--   1. Calculate circular spawn position
+--   2. Raycast downward onto the map
+--   3. Sample hit surface
+--   4. Generate matching debris
+--   5. Animate upward emergence
+--   6. Fade and destroy later
 local function createDebrisChunk(origin, angleDeg, config, baseCFrame)
+
 	local visuals = getVisualsFolder()
 	if not visuals then return end
 
 	local map = getMap()
 	if not map then return end
 
+	-- Convert angle into radians for trig calculations
 	local angle = math.rad(angleDeg)
+
+	-- Randomize radius slightly to avoid perfect circles
 	local radiusJitter = math.random(-3, 3)
+
+	-- Random inward tilt for a more dynamic appearance
 	local arcInwardTilt = math.rad(-math.random(20, 40))
+
 	local distance = config.Radius + radiusJitter
 
+	-- Position debris around a circular radius
 	local offset = Vector3.new(
 		math.cos(angle) * distance,
 		0,
 		math.sin(angle) * distance
 	)
 
+	-- Allows effects to align relative to another CFrame
 	local basePosition = baseCFrame and baseCFrame.Position or origin
+
 	local finalOffsetPosition = basePosition + offset
 
+	-- Cast ray downward to find actual surface
 	local rayOrigin = finalOffsetPosition + Vector3.new(0, config.RaycastUp, 0)
 	local rayDirection = Vector3.new(0, -config.RaycastDown, 0)
 
@@ -87,67 +141,135 @@ local function createDebrisChunk(origin, angleDeg, config, baseCFrame)
 	params.FilterDescendantsInstances = { map }
 
 	local result = Workspace:Raycast(rayOrigin, rayDirection, params)
-	if not result or not result.Instance then return end
+
+	-- Cancel if no valid map surface found
+	if not result or not result.Instance then
+		return
+	end
 
 	local hitPos = result.Position
 	local sourcePart = result.Instance
+
+	-- Create visually matching debris using the helper
 	local debris = createMatchingPartFromSource(sourcePart)
 
+	-- Randomized chunk dimensions
 	applyRandomSize(debris, Vector3.new(
 		math.random(3, 6),
 		math.random(1, 2),
 		math.random(2, 5)
 		))
 
+	-- Face debris toward the center/origin
 	local directionToOrigin = (origin - hitPos)
-	if directionToOrigin.Magnitude <= 0 then return end
+
+	if directionToOrigin.Magnitude <= 0 then
+		return
+	end
+
 	directionToOrigin = directionToOrigin.Unit
 
+	-- Build orientation
 	local lookCFrame = CFrame.new(hitPos, hitPos + directionToOrigin)
+
+	-- Add inward arc tilt
 	local arcRotation = CFrame.Angles(arcInwardTilt, 0, 0)
 
 	debris.CFrame = lookCFrame * arcRotation
+
+	-- Start below the surface for emergence effect
 	debris.Position = debris.Position - Vector3.new(0, debris.Size.Y + 1, 0)
+
 	debris.Parent = visuals
 
+	-- Animate debris rising upward
 	local riseTween = TweenService:Create(
 		debris,
-		TweenInfo.new(config.SpawnTime, Enum.EasingStyle.Sine, Enum.EasingDirection.Out),
+		TweenInfo.new(
+			config.SpawnTime,
+			Enum.EasingStyle.Sine,
+			Enum.EasingDirection.Out
+		),
 		{
 			Transparency = 0,
 			Position = debris.Position + Vector3.new(0, debris.Size.Y + 1, 0)
 		}
 	)
+
 	riseTween:Play()
 
+	-- Cleanup
 	task.delay(config.Lifetime, function()
-		if not debris or not debris.Parent then return end
-		local fade = TweenService:Create(debris, TweenInfo.new(config.FadeOutTime), { Transparency = 1 })
+
+		if not debris or not debris.Parent then
+			return
+		end
+
+		local fade = TweenService:Create(
+			debris,
+			TweenInfo.new(config.FadeOutTime),
+			{
+				Transparency = 1
+			}
+		)
+
 		fade:Play()
+
 		task.delay(config.FadeOutTime, function()
+
 			if debris and debris.Parent then
 				debris:Destroy()
 			end
+
 		end)
 	end)
 end
 
+-- Style 1: Create radial ground debris
+-- Generates debris in a circular formation around a point.
+-- Commonly used for:
+--   • Explosions
+--   • Ground slams
+--   • Shockwaves
+--   • Impact effects
 function DebrisModule:CreateDebris(originPosition, customConfig, baseCFrame)
+
+	-- Clone defaults so modifications remain local
 	local config = table.clone(DEFAULT_CONFIG)
+
+	-- Apply user overrides
 	if customConfig then
 		for k, v in pairs(customConfig) do
 			config[k] = v
 		end
 	end
 
+	-- Spawn debris pieces around the circle
 	for i = 1, config.DebrisCount do
-		local angle = (360 / config.DebrisCount) * i + math.random(-10, 10)
-		createDebrisChunk(originPosition, angle, config, baseCFrame)
+
+		local angle =
+			(360 / config.DebrisCount) * i
+			+ math.random(-10, 10)
+
+		createDebrisChunk(
+			originPosition,
+			angle,
+			config,
+			baseCFrame
+		)
 	end
 end
 
+-- Style 2: Create wall debris
+--   This allows debris effects on:
+--    • Walls
+--    • Vertical cliffs
+--    • Slanted surfaces
+--    • Ceilings
 function DebrisModule:CreateWallDebris(originPosition, normalVector, customConfig)
+
 	local config = table.clone(DEFAULT_CONFIG)
+
 	if customConfig then
 		for k, v in pairs(customConfig) do
 			config[k] = v
@@ -164,38 +286,63 @@ function DebrisModule:CreateWallDebris(originPosition, normalVector, customConfi
 	params.FilterType = Enum.RaycastFilterType.Whitelist
 	params.FilterDescendantsInstances = { map }
 
+	-- Build an orthogonal basis around the wall normal
 	local upVector = Vector3.yAxis
+
+	-- Prevent cross-product instability when vectors align
 	if math.abs(normalVector:Dot(upVector)) > 0.9 then
 		upVector = Vector3.xAxis
 	end
 
 	local right = normalVector:Cross(upVector)
-	if right.Magnitude <= 0 then return end
+
+	if right.Magnitude <= 0 then
+		return
+	end
+
 	right = right.Unit
 
 	local up = right:Cross(normalVector)
-	if up.Magnitude <= 0 then return end
+
+	if up.Magnitude <= 0 then
+		return
+	end
+
 	up = up.Unit
 
+	-- Spawn debris around circular wall pattern
 	for i = 1, config.DebrisCount do
-		local angle = math.rad((360 / config.DebrisCount) * i + math.random(-10, 10))
+
+		local angle = math.rad(
+			(360 / config.DebrisCount) * i
+				+ math.random(-10, 10)
+		)
+
 		local radiusJitter = math.random(-3, 3)
 		local distance = config.Radius + radiusJitter
+
 		local tilt = math.rad(-math.random(20, 40))
 
-		local offset = right * math.cos(angle) * distance + up * math.sin(angle) * distance
+		-- Build local circular offset in wall space
+		local offset =
+			right * math.cos(angle) * distance
+			+ up * math.sin(angle) * distance
 
 		local startPos = originPosition + offset
+
+		-- Raycast toward wall surface
 		local rayOrigin = startPos + normalVector * config.RaycastUp
 		local rayDirection = -normalVector * config.RaycastDown
 
 		local result = Workspace:Raycast(rayOrigin, rayDirection, params)
+
 		if not result or not result.Instance then
 			continue
 		end
 
 		local hitPos = result.Position
 		local sourcePart = result.Instance
+
 		local debris = createMatchingPartFromSource(sourcePart)
 
 		applyRandomSize(debris, Vector3.new(
@@ -205,80 +352,142 @@ function DebrisModule:CreateWallDebris(originPosition, normalVector, customConfi
 			))
 
 		local forward = (originPosition - hitPos)
+
 		if forward.Magnitude <= 0 then
 			debris:Destroy()
 			continue
 		end
+
 		forward = forward.Unit
 
+		-- Generate orientation basis aligned to wall
 		local rightAxis = normalVector:Cross(forward)
+
 		if rightAxis.Magnitude <= 0 then
 			debris:Destroy()
 			continue
 		end
+
 		rightAxis = rightAxis.Unit
 
 		local upAxis = forward:Cross(rightAxis)
+
 		if upAxis.Magnitude <= 0 then
 			debris:Destroy()
 			continue
 		end
+
 		upAxis = upAxis.Unit
 
-		local baseCF = CFrame.fromMatrix(hitPos, rightAxis, upAxis)
+		local baseCF = CFrame.fromMatrix(
+			hitPos,
+			rightAxis,
+			upAxis
+		)
+
 		local arcRot = CFrame.Angles(tilt, 0, 0)
 
 		debris.CFrame = baseCF * arcRot
-		debris.Position = debris.Position - normalVector * (debris.Size.Z + 1)
+
+		-- Spawn embedded inside the wall
+		debris.Position =
+			debris.Position
+		- normalVector * (debris.Size.Z + 1)
+
 		debris.Parent = visuals
 
+		-- Animate outward from wall
 		local rise = TweenService:Create(
 			debris,
-			TweenInfo.new(config.SpawnTime, Enum.EasingStyle.Sine, Enum.EasingDirection.Out),
+			TweenInfo.new(
+				config.SpawnTime,
+				Enum.EasingStyle.Sine,
+				Enum.EasingDirection.Out
+			),
 			{
 				Transparency = 0,
-				Position = debris.Position + normalVector * (debris.Size.Z + 1)
+				Position =
+					debris.Position
+					+ normalVector * (debris.Size.Z + 1)
 			}
 		)
+
 		rise:Play()
 
+		-- Cleanup
 		task.delay(config.Lifetime, function()
-			if not debris or not debris.Parent then return end
-			local fade = TweenService:Create(debris, TweenInfo.new(config.FadeOutTime), { Transparency = 1 })
+
+			if not debris or not debris.Parent then
+				return
+			end
+
+			local fade = TweenService:Create(
+				debris,
+				TweenInfo.new(config.FadeOutTime),
+				{
+					Transparency = 1
+				}
+			)
+
 			fade:Play()
+
 			task.delay(config.FadeOutTime, function()
+
 				if debris and debris.Parent then
 					debris:Destroy()
 				end
+
 			end)
 		end)
 	end
 end
 
+-- Style 3: Create double circle debris
+-- Creates two polygonal debris rings:
+--   • Inner ring
+--   • Outer ring
+-- Unlike the previous functions which spawn individual chunks,
+-- this effect constructs connected segments between sampled points.
+-- The result resembles:
+--  • Downslam effect
+--  • Circular rupture patterns
+--  • Ground ring eruptions
+-- Each ring adapts to terrain slope through surface normals.
 function DebrisModule:CreateDoubleCircle(originPosition, customConfig, baseCFrame)
+
 	local config = {
+
+		-- Ring sizes
 		InnerRadius = 6,
 		OuterRadius = 10,
 
+		-- Segment counts
 		InnerCount = 8,
 		OuterCount = 12,
 
+		-- Segment dimensions
 		Thickness = 0.45,
 		Height = 0.35,
 
+		-- Spawn animation settings
 		SpawnDepth = 1.2,
 		SpawnTime = 0.2,
+
+		-- Lifetime handling
 		FadeOutTime = 1,
 		Lifetime = 2.5,
 
+		-- Surface sampling
 		RaycastUp = 0,
 		RaycastDown = 10,
 
+		-- Randomization
 		InnerScaleJitter = 0.04,
 		OuterScaleJitter = 0.04,
 		RotationJitter = 2,
 	}
 
+	-- Apply custom overrides
 	if customConfig then
 		for k, v in pairs(customConfig) do
 			config[k] = v
@@ -302,11 +511,21 @@ function DebrisModule:CreateDoubleCircle(originPosition, customConfig, baseCFram
 	local ringCF = baseCFrame or CFrame.new(originPosition)
 	local center = ringCF.Position
 
+	-- HELPER: Sample terrain beneath a position
 	local function getGroundData(worldPos: Vector3)
-		local rayOrigin = worldPos + Vector3.new(0, config.RaycastUp, 0)
-		local rayDir = Vector3.new(0, -config.RaycastDown, 0)
 
-		local result = Workspace:Raycast(rayOrigin, rayDir, params)
+		local rayOrigin =
+			worldPos + Vector3.new(0, config.RaycastUp, 0)
+
+		local rayDir =
+			Vector3.new(0, -config.RaycastDown, 0)
+
+		local result = Workspace:Raycast(
+			rayOrigin,
+			rayDir,
+			params
+		)
+
 		if not result or not result.Instance then
 			return nil
 		end
@@ -318,19 +537,28 @@ function DebrisModule:CreateDoubleCircle(originPosition, customConfig, baseCFram
 		}
 	end
 
+	-- INTERNAL: Build one polygon ring
 	local function createPolygonRing(radius: number, count: number, scaleJitter: number)
+
 		local points = table.create(count)
 
+		-- Sample all ring points first
 		for i = 1, count do
+
 			local angle = ((i - 1) / count) * math.pi * 2
+
 			local localOffset = Vector3.new(
 				math.cos(angle) * radius,
 				0,
 				math.sin(angle) * radius
 			)
 
-			local worldOffset = ringCF:VectorToWorldSpace(localOffset)
+			-- Convert local offset into world space
+			local worldOffset =
+				ringCF:VectorToWorldSpace(localOffset)
+
 			local samplePos = center + worldOffset
+
 			local groundData = getGroundData(samplePos)
 
 			if not groundData then
@@ -340,7 +568,9 @@ function DebrisModule:CreateDoubleCircle(originPosition, customConfig, baseCFram
 			points[i] = groundData
 		end
 
+		-- Create segments between neighboring points
 		for i = 1, count do
+
 			local current = points[i]
 			local nextPoint = points[(i % count) + 1]
 
@@ -349,21 +579,27 @@ function DebrisModule:CreateDoubleCircle(originPosition, customConfig, baseCFram
 
 			local segmentVector = b - a
 			local segmentLength = segmentVector.Magnitude
+
 			if segmentLength <= 0.01 then
 				continue
 			end
 
 			local midpoint = (a + b) * 0.5
+
 			local forward = segmentVector.Unit
 
+			-- Blend normals for smoother terrain alignment
 			local up = (current.Normal + nextPoint.Normal)
+
 			if up.Magnitude <= 0.01 then
 				up = Vector3.yAxis
 			else
 				up = up.Unit
 			end
 
+			-- Build orthogonal basis
 			local right = up:Cross(forward)
+
 			if right.Magnitude <= 0.01 then
 				right = Vector3.xAxis
 			else
@@ -372,39 +608,78 @@ function DebrisModule:CreateDoubleCircle(originPosition, customConfig, baseCFram
 
 			up = forward:Cross(right).Unit
 
-			local lengthScale = 1 + ((math.random() * 2 - 1) * scaleJitter)
-			local heightScale = 1 + ((math.random() * 2 - 1) * scaleJitter)
-			local thicknessScale = 1 + ((math.random() * 2 - 1) * scaleJitter)
+			-- Add subtle variation to avoid uniformity
+			local lengthScale =
+				1 + ((math.random() * 2 - 1) * scaleJitter)
 
-			local part = createMatchingPartFromSource(current.SourcePart)
+			local heightScale =
+				1 + ((math.random() * 2 - 1) * scaleJitter)
 
+			local thicknessScale =
+				1 + ((math.random() * 2 - 1) * scaleJitter)
+
+			local part =
+				createMatchingPartFromSource(current.SourcePart)
+
+			-- Segment dimensions
 			applyRandomSize(part, Vector3.new(
 				config.Thickness * thicknessScale,
 				config.Height * heightScale,
 				math.max(0.2, segmentLength * lengthScale)
 				))
 
-			local baseCF = CFrame.lookAt(midpoint, midpoint + forward, up)
+			local baseCF = CFrame.lookAt(
+				midpoint,
+				midpoint + forward,
+				up
+			)
 
-			local inwardTilt = math.rad(math.random(20, 40))
-			local rollJitter = math.rad(math.random(-config.RotationJitter * 100, config.RotationJitter * 100) / 100)
+			-- Decorative inward tilting
+			local inwardTilt =
+				math.rad(math.random(20, 40))
 
-			part.CFrame = baseCF * CFrame.Angles(0, 0, inwardTilt + rollJitter)
+			local rollJitter =
+				math.rad(
+					math.random(
+						-config.RotationJitter * 100,
+						config.RotationJitter * 100
+					) / 100
+				)
 
-			part.Position -= up * (config.SpawnDepth + part.Size.Y * 0.5)
+			part.CFrame =
+				baseCF * CFrame.Angles(
+					0,
+					0,
+					inwardTilt + rollJitter
+				)
+
+			-- Spawn below terrain
+			part.Position -=
+				up * (config.SpawnDepth + part.Size.Y * 0.5)
+
 			part.Parent = visuals
 
+			-- Rise animation
 			local riseTween = TweenService:Create(
 				part,
-				TweenInfo.new(config.SpawnTime, Enum.EasingStyle.Sine, Enum.EasingDirection.Out),
+				TweenInfo.new(
+					config.SpawnTime,
+					Enum.EasingStyle.Sine,
+					Enum.EasingDirection.Out
+				),
 				{
 					Transparency = 0,
-					Position = part.Position + up * (config.SpawnDepth + part.Size.Y * 0.5)
+					Position =
+						part.Position
+						+ up * (config.SpawnDepth + part.Size.Y * 0.5)
 				}
 			)
+
 			riseTween:Play()
 
+			-- Cleanup
 			task.delay(config.Lifetime, function()
+
 				if not part or not part.Parent then
 					return
 				end
@@ -412,21 +687,36 @@ function DebrisModule:CreateDoubleCircle(originPosition, customConfig, baseCFram
 				local fadeTween = TweenService:Create(
 					part,
 					TweenInfo.new(config.FadeOutTime),
-					{ Transparency = 1 }
+					{
+						Transparency = 1
+					}
 				)
+
 				fadeTween:Play()
 
 				task.delay(config.FadeOutTime, function()
+
 					if part and part.Parent then
 						part:Destroy()
 					end
+
 				end)
 			end)
 		end
 	end
 
-	createPolygonRing(config.InnerRadius, config.InnerCount, config.InnerScaleJitter)
-	createPolygonRing(config.OuterRadius, config.OuterCount, config.OuterScaleJitter)
+	-- Generate both rings
+	createPolygonRing(
+		config.InnerRadius,
+		config.InnerCount,
+		config.InnerScaleJitter
+	)
+
+	createPolygonRing(
+		config.OuterRadius,
+		config.OuterCount,
+		config.OuterScaleJitter
+	)
 end
 
 return DebrisModule
