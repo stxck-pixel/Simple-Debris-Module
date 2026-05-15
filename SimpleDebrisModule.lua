@@ -1,4 +1,4 @@
---Connected Discord-GitHub
+-- Connected Discord-GitHub
 local DebrisModule = {}
 
 -- Services
