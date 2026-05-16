@@ -25,7 +25,7 @@ local function getVisualsFolder()
 	return world:FindFirstChild("Visuals")
 end
 
--- get the map folder 
+-- get map folder 
 local function getMap()
 	local world = Workspace:FindFirstChild("World")
 	if not world then return nil end
@@ -33,7 +33,7 @@ local function getMap()
 	return world:FindFirstChild("Map")
 end
 
-
+-- pula 123
 local function createMatchingPartFromSource(sourcePart: BasePart)
 	local newPart
 
@@ -62,6 +62,7 @@ local function createMatchingPartFromSource(sourcePart: BasePart)
 	return newPart
 end
 
+-- size
 local function applyRandomSize(part: BasePart, size: Vector3)
 
 	if part:IsA("Part") and part.Shape == Enum.PartType.Ball then
@@ -78,6 +79,7 @@ local function applyRandomSize(part: BasePart, size: Vector3)
 	end
 end
 
+-- creates the debris chunks
 local function createDebrisChunk(origin, angleDeg, config, baseCFrame)
 
 	local visuals = getVisualsFolder()
@@ -187,6 +189,8 @@ local function createDebrisChunk(origin, angleDeg, config, baseCFrame)
 	end)
 end
 
+
+-- creates the ACTUAL debris impact
 function DebrisModule:CreateDebris(originPosition, customConfig, baseCFrame)
 
 	local config = table.clone(DEFAULT_CONFIG)
@@ -212,7 +216,7 @@ function DebrisModule:CreateDebris(originPosition, customConfig, baseCFrame)
 	end
 end
 
--- basically the same as the earlier but for walls
+-- the same debris impact but for walls
 function DebrisModule:CreateWallDebris(originPosition, normalVector, customConfig)
 
 	local config = table.clone(DEFAULT_CONFIG)
@@ -380,8 +384,11 @@ function DebrisModule:CreateWallDebris(originPosition, normalVector, customConfi
 	end
 end
 
+-- a more situatonal debris impact (mostly used for slamdowns)
 function DebrisModule:CreateDoubleCircle(originPosition, customConfig, baseCFrame)
 
+
+	-- custom config for this one
 	local config = {
 
 		InnerRadius = 6,
@@ -455,6 +462,8 @@ function DebrisModule:CreateDoubleCircle(originPosition, customConfig, baseCFram
 		}
 	end
 
+
+	-- creates the actual ring debris impact
 	local function createPolygonRing(radius: number, count: number, scaleJitter: number)
 
 		local points = table.create(count)
