@@ -17,7 +17,7 @@ local DEFAULT_CONFIG = {
 	RaycastDown = 200
 }
 
--- get visual folder
+-- get visual folder 
 local function getVisualsFolder()
 	local world = Workspace:FindFirstChild("World")
 	if not world then return nil end
@@ -33,7 +33,7 @@ local function getMap()
 	return world:FindFirstChild("Map")
 end
 
--- pula 123
+-- matches the parts from the map to the debris parts (color, material, etc)
 local function createMatchingPartFromSource(sourcePart: BasePart)
 	local newPart
 
@@ -632,5 +632,6 @@ function DebrisModule:CreateDoubleCircle(originPosition, customConfig, baseCFram
 		config.OuterScaleJitter
 	)
 end
+-- whole thing for this module is to have a nice impactful debris around used for: explosion, slamming enemies into the ground, shockwaves
 
 return DebrisModule
