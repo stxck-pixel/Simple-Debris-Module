@@ -62,7 +62,7 @@ local function createMatchingPartFromSource(sourcePart: BasePart)
 	return newPart
 end
 
--- applies a random size to the parts from debris
+-- applies a random size to the parts from debris (used for both ground n wall debris)
 local function applyRandomSize(part: BasePart, size: Vector3)
 
 	if part:IsA("Part") and part.Shape == Enum.PartType.Ball then
@@ -79,7 +79,7 @@ local function applyRandomSize(part: BasePart, size: Vector3)
 	end
 end
 
--- creates the debris chunks/parts
+-- creates the debris chunks/parts (used for both ground n wall debris)
 local function createDebrisChunk(origin, angleDeg, config, baseCFrame)
 
 	local visuals = getVisualsFolder()
@@ -88,6 +88,8 @@ local function createDebrisChunk(origin, angleDeg, config, baseCFrame)
 	local map = getMap()
 	if not map then return end
 
+	-- gets the folders from above
+	
 	local angle = math.rad(angleDeg)
 
 	local radiusJitter = math.random(-3, 3)
@@ -216,7 +218,7 @@ function DebrisModule:CreateDebris(originPosition, customConfig, baseCFrame)
 	end
 end
 
--- the same debris impact but for walls
+-- the same debris impact but for walls , not much to explain just the same function as the other one but for walls
 function DebrisModule:CreateWallDebris(originPosition, normalVector, customConfig)
 
 	local config = table.clone(DEFAULT_CONFIG)
@@ -232,6 +234,8 @@ function DebrisModule:CreateWallDebris(originPosition, normalVector, customConfi
 
 	local map = getMap()
 	if not map then return end
+
+	-- again getting the folders !!
 
 	local params = RaycastParams.new()
 	params.FilterType = Enum.RaycastFilterType.Whitelist
@@ -620,13 +624,13 @@ function DebrisModule:CreateDoubleCircle(originPosition, customConfig, baseCFram
 		end
 	end
 
-	createPolygonRing(
+	createPolygonRing( -- inner circle
 		config.InnerRadius,
 		config.InnerCount,
 		config.InnerScaleJitter
 	)
 
-	createPolygonRing(
+	createPolygonRing( -- outer circle
 		config.OuterRadius,
 		config.OuterCount,
 		config.OuterScaleJitter
