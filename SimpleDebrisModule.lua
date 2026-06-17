@@ -7,17 +7,17 @@ local TweenService = game:GetService("TweenService")
 
 -- Config
 local DEFAULT_CONFIG = {
-	Radius = 12,
-	DebrisCount = 18,
-	FadeOutTime = 1.5,
-	Lifetime = 4,
-	SpawnTime = 0.4,
+	Radius = 12, -- the radius of the debris
+	DebrisCount = 18, -- how many parts in the debris
+	FadeOutTime = 1.5, -- fade out tween so the debris disappears smoothly
+	Lifetime = 4, -- how much the debris stays before its destroyed/cleared
+	SpawnTime = 0.4, -- tween that rises up the debris from the ground/wall
 
 	RaycastUp = 50,
 	RaycastDown = 200
 }
 
--- get visual folder 
+-- get visual folder / so we stay clean we will put the debris inside a visual folder
 local function getVisualsFolder()
 	local world = Workspace:FindFirstChild("World")
 	if not world then return nil end
@@ -25,7 +25,7 @@ local function getVisualsFolder()
 	return world:FindFirstChild("Visuals")
 end
 
--- get map folder 
+-- get map folder / so the debris only creates matching parts from the folder map
 local function getMap()
 	local world = Workspace:FindFirstChild("World")
 	if not world then return nil end
@@ -62,7 +62,7 @@ local function createMatchingPartFromSource(sourcePart: BasePart)
 	return newPart
 end
 
--- size
+-- applies a random size to the parts from debris
 local function applyRandomSize(part: BasePart, size: Vector3)
 
 	if part:IsA("Part") and part.Shape == Enum.PartType.Ball then
@@ -79,7 +79,7 @@ local function applyRandomSize(part: BasePart, size: Vector3)
 	end
 end
 
--- creates the debris chunks
+-- creates the debris chunks/parts
 local function createDebrisChunk(origin, angleDeg, config, baseCFrame)
 
 	local visuals = getVisualsFolder()
@@ -211,7 +211,7 @@ function DebrisModule:CreateDebris(originPosition, customConfig, baseCFrame)
 			originPosition,
 			angle,
 			config,
-			baseCFrame
+			baseCFrame -- < uses the function from above B)
 		)
 	end
 end
@@ -391,20 +391,20 @@ function DebrisModule:CreateDoubleCircle(originPosition, customConfig, baseCFram
 	-- custom config for this one
 	local config = {
 
-		InnerRadius = 6,
-		OuterRadius = 10,
+		InnerRadius = 6, -- radius for the inner circle debris
+		OuterRadius = 10, -- radius for the outer circle debris
 
-		InnerCount = 8,
-		OuterCount = 12,
+		InnerCount = 8, -- how many parts the inner circle has
+		OuterCount = 12, -- how many parts the outer circle has
 
-		Thickness = 0.45,
-		Height = 0.35,
+		Thickness = 0.45, -- thickness of the parts
+		Height = 0.35, -- height of the parts
 
-		SpawnDepth = 1.2,
-		SpawnTime = 0.2,
+		SpawnDepth = 1.2, -- depth for the debris
+		SpawnTime = 0.2, -- rising tween for the spawn
 
-		FadeOutTime = 1,
-		Lifetime = 2.5,
+		FadeOutTime = 1, -- fade out tween to look smooth
+		Lifetime = 2.5, -- how much it stays till its cleared/destroyed
 
 		RaycastUp = 0,
 		RaycastDown = 10,
