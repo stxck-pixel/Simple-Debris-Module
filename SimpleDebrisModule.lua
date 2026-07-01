@@ -15,14 +15,14 @@ local DEFAULT_CONFIG = {
 
 	RaycastUp = 50,
 	RaycastDown = 200
-}
+} -- < we are using a config so the module is more flexible
 
--- get visual folder / so we stay clean we will put the debris inside a visual folder
+-- get the visual folder so temporary debris is kept separate from gameplay objects
 local function getVisualsFolder()
-	local world = Workspace:FindFirstChild("World")
-	if not world then return nil end
+	local world = Workspace:FindFirstChild("World") -- Look for the World folder that contains the hierarchy
+	if not world then return nil end -- stop if the World folder doesnt exist, since the Visuals folder cant be accessed without it
 
-	return world:FindFirstChild("Visuals")
+	return world:FindFirstChild("Visuals") -- return the Visuals folder where temporary debris effects are stored
 end
 
 -- get map folder / so the debris only creates matching parts from the folder map
@@ -62,7 +62,8 @@ local function createMatchingPartFromSource(sourcePart: BasePart)
 	return newPart
 end
 
--- applies a random size to the parts from debris (used for both ground n wall debris)
+-- applies a random size to the parts from debris
+-- this will help us size up the parts from the debris craters
 local function applyRandomSize(part: BasePart, size: Vector3)
 
 	if part:IsA("Part") and part.Shape == Enum.PartType.Ball then
@@ -80,6 +81,7 @@ local function applyRandomSize(part: BasePart, size: Vector3)
 end
 
 -- creates the debris chunks/parts (used for both ground n wall debris)
+-- will help us create the debris easier
 local function createDebrisChunk(origin, angleDeg, config, baseCFrame)
 
 	local visuals = getVisualsFolder()
@@ -90,34 +92,34 @@ local function createDebrisChunk(origin, angleDeg, config, baseCFrame)
 
 	-- gets the folders from above
 	
-	local angle = math.rad(angleDeg)
+	local angle = math.rad(angleDeg) -- convert degrees into radians
 
-	local radiusJitter = math.random(-3, 3)
+	local radiusJitter = math.random(-3, 3) -- sets a random distance using math.random between the parts so it looks more natural
 
-	local arcInwardTilt = math.rad(-math.random(20, 40))
+	local arcInwardTilt = math.rad(-math.random(20, 40)) -- randomly chooses a random angle between -20 & -40
 
-	local distance = config.Radius + radiusJitter
+	local distance = config.Radius + radiusJitter -- final distance 
 
-	local offset = Vector3.new(
+	local offset = Vector3.new(   --calculates the offset around a circle
 		math.cos(angle) * distance,
 		0,
 		math.sin(angle) * distance
 	)
 
-	local basePosition = baseCFrame and baseCFrame.Position or origin
+	local basePosition = baseCFrame and baseCFrame.Position or origin  -- decides the center position
 
-	local finalOffsetPosition = basePosition + offset
+	local finalOffsetPosition = basePosition + offset -- final position
 
 	local rayOrigin = finalOffsetPosition + Vector3.new(0, config.RaycastUp, 0)
 	local rayDirection = Vector3.new(0, -config.RaycastDown, 0)
 
 	local params = RaycastParams.new()
-	params.FilterType = Enum.RaycastFilterType.Whitelist
+	params.FilterType = Enum.RaycastFilterType.Whitelist  -- whitelist raycast so that only the objects from the folder "Map" are read
 	params.FilterDescendantsInstances = { map }
 
-	local result = Workspace:Raycast(rayOrigin, rayDirection, params)
+	local result = Workspace:Raycast(rayOrigin, rayDirection, params) -- shoots the raycast
 
-	if not result or not result.Instance then
+	if not result or not result.Instance then -- if it misses stop the function 
 		return
 	end
 
@@ -126,31 +128,31 @@ local function createDebrisChunk(origin, angleDeg, config, baseCFrame)
 
 	local debris = createMatchingPartFromSource(sourcePart)
 
-	applyRandomSize(debris, Vector3.new(
+	applyRandomSize(debris, Vector3.new(  --uses the applyrandomsize function from above, so the parts have different dimensions
 		math.random(3, 6),
 		math.random(1, 2),
 		math.random(2, 5)
 		))
 
-	local directionToOrigin = (origin - hitPos)
+	local directionToOrigin = (origin - hitPos) -- the final direction to center
 
-	if directionToOrigin.Magnitude <= 0 then
+	if directionToOrigin.Magnitude <= 0 then -- if it spawned exatcly in the center, it will stop the function
 		return
 	end
 
-	directionToOrigin = directionToOrigin.Unit
+	directionToOrigin = directionToOrigin.Unit -- turns it into a unit vector
 
-	local lookCFrame = CFrame.new(hitPos, hitPos + directionToOrigin)
+	local lookCFrame = CFrame.new(hitPos, hitPos + directionToOrigin) -- face toward the center using cframe
 
-	local arcRotation = CFrame.Angles(arcInwardTilt, 0, 0)
+	local arcRotation = CFrame.Angles(arcInwardTilt, 0, 0) -- creates an inward tilt
 
-	debris.CFrame = lookCFrame * arcRotation
+	debris.CFrame = lookCFrame * arcRotation -- combines the lookCframe and the ArcRotation
 
-	debris.Position = debris.Position - Vector3.new(0, debris.Size.Y + 1, 0)
+	debris.Position = debris.Position - Vector3.new(0, debris.Size.Y + 1, 0) -- this moves the structure undeground
 
-	debris.Parent = visuals
+	debris.Parent = visuals 
 
-	local riseTween = TweenService:Create(
+	local riseTween = TweenService:Create(  -- rise animation, changes the transparency 1 > 0, and the position from underground to ground level, creating a smooth rising animation
 		debris,
 		TweenInfo.new(
 			config.SpawnTime,
@@ -163,15 +165,15 @@ local function createDebrisChunk(origin, angleDeg, config, baseCFrame)
 		}
 	)
 
-	riseTween:Play()
+	riseTween:Play() -- plays the rise anim
 
-	task.delay(config.Lifetime, function()
+	task.delay(config.Lifetime, function()  -- the function waits however long the Lifetime specifies
 
 		if not debris or not debris.Parent then
 			return
-		end
+		end   -- verifies if the debris still exists
 
-		local fade = TweenService:Create(
+		local fade = TweenService:Create(  -- fade out animation, changes the transparency 0 > 1, duration of the fade out is specified by the FadeOutTime config
 			debris,
 			TweenInfo.new(config.FadeOutTime),
 			{
@@ -179,9 +181,9 @@ local function createDebrisChunk(origin, angleDeg, config, baseCFrame)
 			}
 		)
 
-		fade:Play()
+		fade:Play() -- plays the fade out anim 
 
-		task.delay(config.FadeOutTime, function()
+		task.delay(config.FadeOutTime, function() -- waits how long FadeOutTime specifies then destroys the debris
 
 			if debris and debris.Parent then
 				debris:Destroy()
@@ -192,18 +194,20 @@ local function createDebrisChunk(origin, angleDeg, config, baseCFrame)
 end
 
 
--- creates the ACTUAL debris impact
+-- creates the ACTUAL debris impact / can be called like this DebrisModule:CreateDebris(position)
 function DebrisModule:CreateDebris(originPosition, customConfig, baseCFrame)
 
-	local config = table.clone(DEFAULT_CONFIG)
+	local config = table.clone(DEFAULT_CONFIG) -- makes a copy of the configuration, so that we dont have to edit the default one, 
+	-- if we edited the default one every future debris would use the modified values. So by cloning it, each CreateDebris() gets its own individual config
 
-	if customConfig then
+	if customConfig then -- this checks for any customconfig if theres no custom this part is skipped
 		for k, v in pairs(customConfig) do
 			config[k] = v
 		end
-	end
+	end    
+	
 
-	for i = 1, config.DebrisCount do
+	for i = 1, config.DebrisCount do -- this loop runs for every debris created using the config.DebrisCount
 
 		local angle =
 			(360 / config.DebrisCount) * i
@@ -213,7 +217,7 @@ function DebrisModule:CreateDebris(originPosition, customConfig, baseCFrame)
 			originPosition,
 			angle,
 			config,
-			baseCFrame -- < uses the function from above B)
+			baseCFrame -- < uses the function from above 
 		)
 	end
 end
