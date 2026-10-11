@@ -88,7 +88,7 @@ local function createDebrisChunk(origin, angleDeg, config, baseCFrame)
 	local map = getMap()
 	if not map then return end
 
-	-- gets the folders from above
+	-- get folders from above
 	
 	local angle = math.rad(angleDeg) -- convert degrees into radians
 
@@ -98,7 +98,7 @@ local function createDebrisChunk(origin, angleDeg, config, baseCFrame)
 
 	local distance = config.Radius + radiusJitter -- final distance 
 
-	local offset = Vector3.new(   --calculates the offset around a circle
+	local offset = Vector3.new(   -- calculates offset around circle
 		math.cos(angle) * distance,
 		0,
 		math.sin(angle) * distance
@@ -115,9 +115,9 @@ local function createDebrisChunk(origin, angleDeg, config, baseCFrame)
 	params.FilterType = Enum.RaycastFilterType.Whitelist  -- whitelist raycast so that only the objects from the folder "Map" are read
 	params.FilterDescendantsInstances = { map }
 
-	local result = Workspace:Raycast(rayOrigin, rayDirection, params) -- shoots the raycast
+	local result = Workspace:Raycast(rayOrigin, rayDirection, params) -- shoots raycast
 
-	if not result or not result.Instance then -- if it misses stop the function 
+	if not result or not result.Instance then -- if  misses stop the function 
 		return
 	end
 
@@ -132,9 +132,9 @@ local function createDebrisChunk(origin, angleDeg, config, baseCFrame)
 		math.random(2, 5)
 		))
 
-	local directionToOrigin = (origin - hitPos) -- the final direction to center
+	local directionToOrigin = (origin - hitPos) -- final direction to center
 
-	if directionToOrigin.Magnitude <= 0 then -- if it spawned exatcly in the center, it will stop the function
+	if directionToOrigin.Magnitude <= 0 then -- if  spawned exatcly in the center, stop the function
 		return
 	end
 
@@ -142,7 +142,7 @@ local function createDebrisChunk(origin, angleDeg, config, baseCFrame)
 
 	local lookCFrame = CFrame.new(hitPos, hitPos + directionToOrigin) -- face toward the center using cframe
 
-	local arcRotation = CFrame.Angles(arcInwardTilt, 0, 0) -- creates an inward tilt
+	local arcRotation = CFrame.Angles(arcInwardTilt, 0, 0) -- create inward tilt
 
 	debris.CFrame = lookCFrame * arcRotation -- combines the lookCframe and the ArcRotation
 
@@ -163,15 +163,15 @@ local function createDebrisChunk(origin, angleDeg, config, baseCFrame)
 		}
 	)
 
-	riseTween:Play() -- plays the rise anim
+	riseTween:Play() -- rise tween play
 
-	task.delay(config.Lifetime, function()  -- the function waits however long the Lifetime specifies
+	task.delay(config.Lifetime, function()  -- delay wait lifetime
 
 		if not debris or not debris.Parent then
 			return
-		end   -- verifies if the debris still exists
+		end   -- if no debris then end
 
-		local fade = TweenService:Create(  -- fade out animation, changes the transparency 0 > 1, duration of the fade out is specified by the FadeOutTime config
+		local fade = TweenService:Create(  -- create tween, transparency 0>1
 			debris,
 			TweenInfo.new(config.FadeOutTime),
 			{
@@ -179,7 +179,7 @@ local function createDebrisChunk(origin, angleDeg, config, baseCFrame)
 			}
 		)
 
-		fade:Play() -- plays the fade out anim 
+		fade:Play() -- fade out play
 
 		task.delay(config.FadeOutTime, function()
 
@@ -203,7 +203,7 @@ function DebrisModule:CreateDebris(originPosition, customConfig, baseCFrame)
 	end    
 	
 
-	for i = 1, config.DebrisCount do -- this loop runs for every debris created using the config.DebrisCount
+	for i = 1, config.DebrisCount do -- loop runs for every debris created using the config.DebrisCount
 
 		local angle =
 			(360 / config.DebrisCount) * i
@@ -216,6 +216,180 @@ function DebrisModule:CreateDebris(originPosition, customConfig, baseCFrame)
 			baseCFrame 
 		)
 	end
+end
+
+function DebrisModule:CreateDoubleCircle(originPosition, customConfig, baseCFrame)
+	local config = {
+		InnerRadius = 6,
+		OuterRadius = 10,
+
+		InnerCount = 8,
+		OuterCount = 12,
+
+		Thickness = 0.45,
+		Height = 0.35,
+
+		SpawnDepth = 1.2,
+		SpawnTime = 0.2,
+		FadeOutTime = 1,
+		Lifetime = 2.5,
+
+		RaycastUp = 0,
+		RaycastDown = 10,
+
+		InnerScaleJitter = 0.04,
+		OuterScaleJitter = 0.04,
+		RotationJitter = 2,
+	}
+
+	if customConfig then
+		for k, v in pairs(customConfig) do
+			config[k] = v
+		end
+	end
+
+	local visuals = getVisualsFolder()
+	if not visuals then
+		return
+	end
+
+	local map = getMap()
+	if not map then
+		return
+	end
+
+	local params = RaycastParams.new()
+	params.FilterType = Enum.RaycastFilterType.Whitelist
+	params.FilterDescendantsInstances = { map }
+
+	local ringCF = baseCFrame or CFrame.new(originPosition)
+	local center = ringCF.Position
+
+	local function getGroundData(worldPos: Vector3)
+		local rayOrigin = worldPos + vector.create(0, config.RaycastUp, 0)
+		local rayDir = vector.create(0, -config.RaycastDown, 0)
+
+		local result = Workspace:Raycast(rayOrigin, rayDir, params)
+		if not result or not result.Instance then
+			return nil
+		end
+
+		return {
+			Position = result.Position,
+			Normal = result.Normal,
+			SourcePart = result.Instance,
+		}
+	end
+
+	local function createPolygonRing(radius: number, count: number, scaleJitter: number)
+		local points = table.create(count)
+
+		for i = 1, count do
+			local angle = ((i - 1) / count) * math.pi * 2
+			local localOffset = vector.create(
+				math.cos(angle) * radius,
+				0,
+				math.sin(angle) * radius
+			)
+
+			local worldOffset = ringCF:VectorToWorldSpace(localOffset)
+			local samplePos = center + worldOffset
+			local groundData = getGroundData(samplePos)
+
+			if not groundData then
+				return
+			end
+
+			points[i] = groundData
+		end
+
+		for i = 1, count do
+			local current = points[i]
+			local nextPoint = points[(i % count) + 1]
+
+			local a = current.Position
+			local b = nextPoint.Position
+
+			local segmentVector = b - a
+			local segmentLength = segmentVector.Magnitude
+			if segmentLength <= 0.01 then
+				continue
+			end
+
+			local midpoint = (a + b) * 0.5
+			local forward = segmentVector.Unit
+
+			local up = (current.Normal + nextPoint.Normal)
+			if up.Magnitude <= 0.01 then
+				up = Vector3.yAxis
+			else
+				up = up.Unit
+			end
+
+			local right = up:Cross(forward)
+			if right.Magnitude <= 0.01 then
+				right = Vector3.xAxis
+			else
+				right = right.Unit
+			end
+
+			up = forward:Cross(right).Unit
+
+			local lengthScale = 1 + ((math.random() * 2 - 1) * scaleJitter)
+			local heightScale = 1 + ((math.random() * 2 - 1) * scaleJitter)
+			local thicknessScale = 1 + ((math.random() * 2 - 1) * scaleJitter)
+
+			local part = createMatchingPartFromSource(current.SourcePart)
+
+			applyRandomSize(part, vector.create(
+				config.Thickness * thicknessScale,
+				config.Height * heightScale,
+				math.max(0.2, segmentLength * lengthScale)
+				))
+
+			local baseCF = CFrame.lookAt(midpoint, midpoint + forward, up)
+
+			local inwardTilt = math.rad(math.random(20, 40))
+			local rollJitter = math.rad(math.random(-config.RotationJitter * 100, config.RotationJitter * 100) / 100)
+
+			part.CFrame = baseCF * CFrame.Angles(0, 0, inwardTilt + rollJitter)
+
+			part.Position -= up * (config.SpawnDepth + part.Size.Y * 0.5)
+			part.Parent = visuals
+
+			local riseTween = TweenService:Create(
+				part,
+				TweenInfo.new(config.SpawnTime, Enum.EasingStyle.Sine, Enum.EasingDirection.Out),
+				{
+					Transparency = 0,
+					Position = part.Position + up * (config.SpawnDepth + part.Size.Y * 0.5)
+				}
+			)
+			riseTween:Play()
+
+			task.delay(config.Lifetime, function()
+				if not part or not part.Parent then
+					return
+				end
+
+				local fadeTween = TweenService:Create(
+					part,
+					TweenInfo.new(config.FadeOutTime),
+					{ Transparency = 1 }
+				)
+				fadeTween:Play()
+
+				task.delay(config.FadeOutTime, function()
+					if part and part.Parent then
+						part:Destroy()
+					end
+				end)
+			end)
+		end
+	end
+
+	createPolygonRing(config.InnerRadius, config.InnerCount, config.InnerScaleJitter)
+	createPolygonRing(config.OuterRadius, config.OuterCount, config.OuterScaleJitter)
 end
 
 return DebrisModule
