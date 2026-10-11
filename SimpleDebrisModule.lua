@@ -220,11 +220,11 @@ end
 
 function DebrisModule:CreateDoubleCircle(originPosition, customConfig, baseCFrame)
 	local config = {
-		InnerRadius = 6,
-		OuterRadius = 10,
+		InnerRadius = 6, -- inner rings points 6 studs from the center
+		OuterRadius = 10, -- outer ring points 10 studs from the center
 
-		InnerCount = 8,
-		OuterCount = 12,
+		InnerCount = 8, -- inner ring to 8 segments
+		OuterCount = 12, -- outer ring to 12 segments
 
 		Thickness = 0.45,
 		Height = 0.35,
@@ -237,39 +237,39 @@ function DebrisModule:CreateDoubleCircle(originPosition, customConfig, baseCFram
 		RaycastUp = 0,
 		RaycastDown = 10,
 
-		InnerScaleJitter = 0.04,
-		OuterScaleJitter = 0.04,
-		RotationJitter = 2,
+		InnerScaleJitter = 0.04, -- random inner segments length, height, thickness
+		OuterScaleJitter = 0.04, -- random outer segments length, height, thickness
+		RotationJitter = 2, -- random rotation between -2 and +2
 	}
 
-	if customConfig then
-		for k, v in pairs(customConfig) do
-			config[k] = v
+	if customConfig then -- if custom settings provided then 
+		for k, v in pairs(customConfig) do -- literate through every key in custom value  
+			config[k] = v -- replace default setting with custom value
 		end
 	end
 
-	local visuals = getVisualsFolder()
-	if not visuals then
+	local visuals = getVisualsFolder() -- get "Visual" Folder
+	if not visuals then -- if no "Visual" folder then end function
 		return
 	end
 
-	local map = getMap()
-	if not map then
+	local map = getMap() -- get "Map" folder
+	if not map then -- if no "Map" folder then end function
 		return
 	end
 
 	local params = RaycastParams.new()
 	params.FilterType = Enum.RaycastFilterType.Whitelist
-	params.FilterDescendantsInstances = { map }
+	params.FilterDescendantsInstances = { map } -- restrict ground detection to only "Map" folder
 
-	local ringCF = baseCFrame or CFrame.new(originPosition)
-	local center = ringCF.Position
+	local ringCF = baseCFrame or CFrame.new(originPosition) -- use supplied Cframe 
+	local center = ringCF.Position -- extract world position of circle center 
 
-	local function getGroundData(worldPos: Vector3)
-		local rayOrigin = worldPos + vector.create(0, config.RaycastUp, 0)
-		local rayDir = vector.create(0, -config.RaycastDown, 0)
+	local function getGroundData(worldPos: Vector3) -- define helper function
+		local rayOrigin = worldPos + vector.create(0, config.RaycastUp, 0) -- raycast direction upward "RaycastUp"
+		local rayDir = vector.create(0, -config.RaycastDown, 0) --raycast direction downward "RaycastDown"
 
-		local result = Workspace:Raycast(rayOrigin, rayDir, params)
+		local result = Workspace:Raycast(rayOrigin, rayDir, params) -- detect downward raycast 
 		if not result or not result.Instance then
 			return nil
 		end
@@ -282,25 +282,25 @@ function DebrisModule:CreateDoubleCircle(originPosition, customConfig, baseCFram
 	end
 
 	local function createPolygonRing(radius: number, count: number, scaleJitter: number)
-		local points = table.create(count)
+		local points = table.create(count) -- create table to store 
 
-		for i = 1, count do
-			local angle = ((i - 1) / count) * math.pi * 2
+		for i = 1, count do -- iterates through every point
+			local angle = ((i - 1) / count) * math.pi * 2 -- calculate current point 360 degree 
 			local localOffset = vector.create(
 				math.cos(angle) * radius,
 				0,
 				math.sin(angle) * radius
-			)
+			) -- calculate horizontal offset
 
-			local worldOffset = ringCF:VectorToWorldSpace(localOffset)
-			local samplePos = center + worldOffset
-			local groundData = getGroundData(samplePos)
+			local worldOffset = ringCF:VectorToWorldSpace(localOffset) -- convert offset to world space direction
+			local samplePos = center + worldOffset -- calculate ground raycast position
+			local groundData = getGroundData(samplePos) -- find ground beneath ring point 
 
 			if not groundData then
 				return
-			end
+			end -- if no valid ground hit end
 
-			points[i] = groundData
+			points[i] = groundData -- store ground, surface, source fro current point 
 		end
 
 		for i = 1, count do
